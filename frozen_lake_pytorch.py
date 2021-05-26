@@ -6,6 +6,7 @@ import torch.optim as optim
 import torch as T
 
 from collections import deque
+import random
 
 class LinearDeepQNetwork(nn.Module):
   def __init__(self, lr, n_actions, input):
@@ -30,7 +31,7 @@ class LinearDeepQNetwork(nn.Module):
 
 
 class Agent():
-  def __init__(self, lr, n_actions, gamma=0.95,
+  def __init__(self, lr, n_actions, gamma=0.90,
                epsilon=1.0, eps_dec=1e-5, eps_min=0.01):
     """ Agent init takes:
     --
@@ -115,28 +116,29 @@ class Agent():
     loss.backward()
 ## 
     self.Q.optimizer.step()
-#    self.decrement_epsilon()
-
+    self.decrement_epsilon()
 
   def batch_learn(self, batch_size):
-        for i in range(len(self.memory) - batch_size + 1, len(self.memory)):
-            (state, action, reward, next_state, done) = self.memory[i]
+#        for i in range(len(self.memory) - batch_size + 1, len(self.memory)):
+#            (state, action, reward, next_state, done) = self.memory[i]
+        minibatch = random.sample(self.memory, batch_size)
+        for state, action, reward, next_state, done in minibatch:
             self.learn(state, action, reward, next_state, done)
 
-        self.decrement_epsilon()
+#        self.decrement_epsilon()
 
 import gym
 import matplotlib.pyplot as plt
 import numpy as np
 
-env = gym.make('FrozenLake-v0')
+env = gym.make('FrozenLake-v0', is_slippery = False)
 
 n_games = 2000
 scores = []
 win_pct_list = []
 batch_size = 100
 
-agent = Agent(lr=0.0001, n_actions=4)
+agent = Agent(lr=0.0005, n_actions=4)
 
 for i in range(n_games):
   score = 0
@@ -157,9 +159,6 @@ for i in range(n_games):
   scores.append(score)
   
   if len(agent.memory) > batch_size:
-#     #print(f"batch size is {batch_size}")
-#     #if batch_size % 32 == 0:
-#     #  print("window sliced")
       agent.batch_learn(batch_size)
 
   if i % 100 == 0:
@@ -168,5 +167,14 @@ for i in range(n_games):
     print('episode', i, 'win pct %.2f' % win_pct,
           'epsilon %.2f' % agent.epsilon)
   
+    print('learn snapshot: ')
+    for line in range(4):
+        col_values = []
+        for col in range(4):
+            stateT = T.tensor(agent.np_arrays[line * 4 + col], dtype=T.float).to(agent.Q.device)
+            actionsT = agent.Q.forward(stateT.unsqueeze(dim=0))
+            col_values.append((T.argmax(actionsT).item(), T.max(actionsT)))
+        print(col_values)
+
 plt.plot(win_pct_list)
 plt.show()
