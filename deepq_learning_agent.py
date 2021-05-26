@@ -9,7 +9,7 @@ from collections import deque
 import random
 
 class LinearDeepQNetwork(nn.Module):
-  def __init__(self, lr, n_actions, input):
+  def __init__(self, lr, input, n_actions):
     super(LinearDeepQNetwork, self).__init__()
 
     self.fc1 = nn.Linear(input, 128)
@@ -31,13 +31,13 @@ class LinearDeepQNetwork(nn.Module):
 
 
 class Agent():
-  def __init__(self, lr, n_actions, gamma=0.90,
+  def __init__(self, lr, state_space, action_space, gamma=0.90,
                epsilon=1.0, eps_dec=1e-5, eps_min=0.01):
     """ Agent init takes:
     --
     lr - alpha learning rate factor
-    input_dims - from our environment dimensions
-    n_actions - actions space dimension
+    state_space - environment state space dimension
+    action_space - environment actions space dimension
     gamma - discount factor on MDP rewards
     epsilon - Epsilon Greedy initial value (exploration threshold)
     eps_dec - Epsilon Greedy decrease factor
@@ -45,9 +45,8 @@ class Agent():
       
     """
     self.lr = lr
-    # Joao: hardcoded as 1
-    self.input_dims = 16
-    self.n_actions = n_actions
+    self.input_dims = state_space
+    self.n_actions = action_space
     self.gamma = gamma
     self.epsilon = epsilon
     self.eps_dec = eps_dec
@@ -59,7 +58,7 @@ class Agent():
 
     self.memory = deque(maxlen=2000)
 
-    self.Q = LinearDeepQNetwork(self.lr, self.n_actions, self.input_dims)
+    self.Q = LinearDeepQNetwork(self.lr, self.input_dims, self.n_actions)
 
   def one_hot_state(self, state):
     state_m = np.zeros((1, self.input_dims))
@@ -122,3 +121,36 @@ class Agent():
       minibatch = random.sample(self.memory, batch_size)
       for state, action, reward, next_state, done in minibatch:
         self.learn(state, action, reward, next_state, done)
+
+  def print_learn_snapshot(self):
+    """
+    Print a snapshot of learning situation
+
+    |S(.)0.589||F(>)0.653||F(.)0.727||F(<)0.668|
+    |F(.)0.655||H(.)0.677||F(.)0.809||H(.)0.637|
+    |F(>)0.728||F(>)0.810||F(.)0.900||H(>)0.808|
+    |H(.)0.684||F(>)0.898||F(>)0.997||G(.)0.657|
+
+    Cell format: <status>(<best_action>)<best_action_value>
+      status      - 'S'=start, 'G'=goal, 'F'=frozen, 'H'=hole
+      best_action - '<'=start, '.'=down, '>'=right, '^'=up
+      best_value  - Extracted value for best_action from NN tensor
+    """
+
+    print('\nLearn snapshot: ')
+
+    # actions:: LEFT = 0 DOWN = 1 RIGHT = 2 UP = 3
+    action_str = ['<', '.', '>', '^']
+
+    map_str = []
+    map_str.append(['S', 'F', 'F', 'F'])
+    map_str.append(['F', 'H', 'F', 'H'])
+    map_str.append(['F', 'F', 'F', 'H'])
+    map_str.append(['H', 'F', 'F', 'G'])
+
+    for line in range(4):
+      for col in range(4):
+        stateT = T.tensor(self.np_arrays[line * 4 + col], dtype=T.float).to(self.Q.device)
+        actionsT = self.Q.forward(stateT.unsqueeze(dim=0))
+        print(f'|{map_str[line][col]}({action_str[T.argmax(actionsT).item()]}){T.max(actionsT).item():4.3f}|', end='')
+      print('')
