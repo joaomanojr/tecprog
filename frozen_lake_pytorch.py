@@ -5,6 +5,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torch as T
 
+from collections import deque
+
 class LinearDeepQNetwork(nn.Module):
   def __init__(self, lr, n_actions, input):
     super(LinearDeepQNetwork, self).__init__()
@@ -54,6 +56,8 @@ class Agent():
     for i in range(self.input_dims):
       self.np_arrays.append(self.one_hot_state(i))
 
+    self.memory = deque(maxlen=2000)
+
     self.Q = LinearDeepQNetwork(self.lr, self.n_actions, self.input_dims)
 
   def one_hot_state(self, state):
@@ -84,7 +88,7 @@ class Agent():
     # Look: my beloved C ternary in python terms!
     self.epsilon = self.epsilon - self.eps_dec \
                       if self.epsilon > self.eps_min else self.eps_min
-   
+
   def learn(self, state, action, reward, state_, done):
     """ Off Policy (always Greedy) Learn function 
     --
@@ -96,20 +100,30 @@ class Agent():
     #print(f'reward is {reward}')
     if not done:
       actions_T = self.Q.forward(state_T.unsqueeze(dim=0))
-      reward = reward + self.gamma * T.max(actions_T)
+      rewardT = reward + self.gamma * T.max(actions_T)
+    else:
+      rewardT = T.tensor(reward, dtype=T.float).to(self.Q.device)
 
     stateT = T.tensor(self.np_arrays[state], dtype=T.float).to(self.Q.device)
 
     q_pred = self.Q.forward(stateT.unsqueeze(dim=0))
     q_target = self.Q.forward(stateT.unsqueeze(dim=0))
-    q_target[0][0][action] = reward
+    q_target[0][0][action] = rewardT
     loss = self.Q.loss(q_pred, q_target).to(self.Q.device)
     ## # Author: backpropagate cost and add a step on our optimizer.
     ## # These two calls are critical for learn loop.
     loss.backward()
 ## 
     self.Q.optimizer.step()
-    self.decrement_epsilon()
+#    self.decrement_epsilon()
+
+
+  def batch_learn(self, batch_size):
+        for i in range(len(self.memory) - batch_size + 1, len(self.memory)):
+            (state, action, reward, next_state, done) = self.memory[i]
+            self.learn(state, action, reward, next_state, done)
+
+        self.decrement_epsilon()
 
 import gym
 import matplotlib.pyplot as plt
@@ -120,6 +134,7 @@ env = gym.make('FrozenLake-v0')
 n_games = 2000
 scores = []
 win_pct_list = []
+batch_size = 100
 
 agent = Agent(lr=0.0001, n_actions=4)
 
@@ -136,10 +151,17 @@ for i in range(n_games):
     obs_, reward, done, info = env.step(action)
     #env.render()
     score += reward
-    agent.learn(obs, action, reward, obs_, done)
+    #agent.learn(obs, action, reward, obs_, done)
+    agent.memory.append((obs, action, reward, obs_, done))
     obs = obs_
   scores.append(score)
   
+  if len(agent.memory) > batch_size:
+#     #print(f"batch size is {batch_size}")
+#     #if batch_size % 32 == 0:
+#     #  print("window sliced")
+      agent.batch_learn(batch_size)
+
   if i % 100 == 0:
     win_pct = np.mean(scores[-100:])
     win_pct_list.append(win_pct)
