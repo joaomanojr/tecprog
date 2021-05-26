@@ -69,7 +69,6 @@ class Agent():
   def choose_action(self, observation):
     ''' Choose Epsilon Greedy action for a given state '''
     rand_ = np.random.random()
-    # print(f'rand_ is {rand_}')
 
     if rand_ > self.epsilon:
       state = T.tensor(self.np_arrays[observation], dtype=T.float).to(self.Q.device)
@@ -111,18 +110,15 @@ class Agent():
     q_target = self.Q.forward(stateT.unsqueeze(dim=0))
     q_target[0][0][action] = rewardT
     loss = self.Q.loss(q_pred, q_target).to(self.Q.device)
-    ## # Author: backpropagate cost and add a step on our optimizer.
-    ## # These two calls are critical for learn loop.
+
+    # Author: backpropagate cost and add a step on our optimizer.
+    # These two calls are critical for learn loop.
     loss.backward()
-## 
     self.Q.optimizer.step()
+
     self.decrement_epsilon()
 
   def batch_learn(self, batch_size):
-#        for i in range(len(self.memory) - batch_size + 1, len(self.memory)):
-#            (state, action, reward, next_state, done) = self.memory[i]
-        minibatch = random.sample(self.memory, batch_size)
-        for state, action, reward, next_state, done in minibatch:
-            self.learn(state, action, reward, next_state, done)
-
-#        self.decrement_epsilon()
+      minibatch = random.sample(self.memory, batch_size)
+      for state, action, reward, next_state, done in minibatch:
+        self.learn(state, action, reward, next_state, done)
