@@ -1,3 +1,10 @@
+# This code is heavily based on Phil Tabor Q learning:
+# https://github.com/philtabor/Deep-Q-Learning-Paper-To-Code/blob/master/q_learning/frozen_lake_q_learning.py
+#
+# On this level main difference is to learn in batches as implmented by begooboi Reddit user:
+# https://www.reddit.com/r/learnmachinelearning/comments/9vasqm/review_my_code_dqn_for_gym_frozenlake/
+
+
 import gym
 import matplotlib.pyplot as plt
 import numpy as np
