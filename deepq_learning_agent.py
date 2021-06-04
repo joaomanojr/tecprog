@@ -127,18 +127,24 @@ class Agent():
         """
         Print a snapshot of learning situation
 
-        |S(.)0.589||F(>)0.653||F(.)0.727||F(<)0.668|
-        |F(.)0.655||H(.)0.677||F(.)0.809||H(.)0.637|
-        |F(>)0.728||F(>)0.810||F(.)0.900||H(>)0.808|
-        |H(.)0.684||F(>)0.898||F(>)0.997||G(.)0.657|
+        Learn snapshot:
+        |S(<) 0.061||F(^) 0.095||F(<)-0.036||F(<) 0.049|
+        |F(^) 0.074||H( ) ~~~~ ||F(>)-0.018||H( ) ~~~~ |
+        |F(<) 0.000||F(^) 0.043||F(>) 0.037||H( ) ~~~~ |
+        |H( ) ~~~~ ||F(<) 0.066||F(<) 0.072||G( )  \o/ |
 
         Cell format: <status>(<best_action>)<best_action_value>
           status      - 'S'=start, 'G'=goal, 'F'=frozen, 'H'=hole
           best_action - '<'=start, '.'=down, '>'=right, '^'=up
           best_value  - Extracted value for best_action from NN tensor
+        
+        End cells:
+          bad ending - ~~~~ (water)
+          good ending -  \o/ (happy)
+
         """
 
-        print('\nLearn snapshot: ')
+        print('--\nLearn snapshot: ')
 
         # actions:: LEFT = 0 DOWN = 1 RIGHT = 2 UP = 3
         action_str = ['<', '.', '>', '^']
@@ -153,6 +159,16 @@ class Agent():
             for col in range(4):
                 stateT = T.tensor(self.np_arrays[line * 4 + col], dtype=T.float).to(self.Q.device)
                 actionsT = self.Q.forward(stateT.unsqueeze(dim=0))
-                print(
-                    f'|{map_str[line][col]}({action_str[T.argmax(actionsT).item()]}){T.max(actionsT).item():4.3f}|', end='')
+                if map_str[line][col] == 'F' or map_str[line][col] == 'S':
+                    action_max = action_str[T.argmax(actionsT).item()]
+                    action_max_value = f'{T.max(actionsT).item(): 4.3f}'
+                elif map_str[line][col] == 'H':
+                    action_max = ' '
+                    action_max_value = ' ~~~~ '
+                else:
+                    action_max = ' '
+                    action_max_value = '  \o/ '
+
+                print(f'|{map_str[line][col]}({action_max}){action_max_value}|', end='')
             print('')
+        print('--\n')
